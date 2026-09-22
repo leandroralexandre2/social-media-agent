@@ -1,0 +1,25 @@
+services:
+  social-media-agent:
+    build: .
+    image: social-media-agent:local
+    container_name: social-media-agent
+    restart: unless-stopped
+    pull_policy: never
+    env_file:
+      - ./plow-credentials
+    environment:
+      AGENT_ID: social-media-agent
+      HERMES_UID: "1000"
+      HERMES_GID: "1000"
+      TZ: ${TZ:-America/Sao_Paulo}
+      SOCIAL_MEDIA_CONFIG: /opt/plow/social/config/social-media.toml
+      SOCIAL_MESSAGES_RECIPIENT: ${SOCIAL_MESSAGES_RECIPIENT:-}
+      SOCIAL_APPROVAL_CHAT_UID: ${SOCIAL_APPROVAL_CHAT_UID:-}
+      SOCIAL_POLL_SCHEDULE: ${SOCIAL_POLL_SCHEDULE:-every 1h}
+    volumes:
+      - agent-home:/var/lib/hermes
+      - ./runtime/social-media.toml:/opt/plow/social/config/social-media.toml:ro
+    stop_grace_period: 35s
+
+volumes:
+  agent-home:

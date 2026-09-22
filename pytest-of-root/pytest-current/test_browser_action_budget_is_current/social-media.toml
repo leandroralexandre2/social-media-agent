@@ -1,0 +1,30 @@
+[company]
+name = "Acme"
+aliases = ["@acme"]
+[monitor]
+max_items_per_platform = 15
+max_browser_actions_per_platform = 0
+[browser]
+reuse_authenticated_session = true
+keep_session_open_minutes = 120
+[publishing]
+x_min_interval_seconds = 60
+linkedin_min_interval_seconds = 45
+x_max_publications_per_24h = 25
+linkedin_max_publications_per_24h = 25
+x_error_344_backoff_seconds = [12, 20]
+post_fill_settle_seconds = 2
+[platforms.x]
+enabled = true
+notifications_url = "https://x.com/notifications"
+search_terms = ["Acme"]
+[platforms.linkedin]
+enabled = true
+notifications_url = "https://www.linkedin.com/notifications/"
+search_terms = []
+[persona]
+description = "Friendly and concise"
+languages = ["en"]
+forbidden_topics = ["legal promises"]
+[safety]
+auto_publish = false
