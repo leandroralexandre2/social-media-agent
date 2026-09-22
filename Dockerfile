@@ -1,6 +1,11 @@
 # Same Plow/Hermes base contract used by str-hermes-agent-main. The digest keeps
 # the runtime reproducible; update tag and index digest together.
-FROM public.ecr.aws/e1h7x4a2/plow-cloud-agents:base-80ef5024eb4b770e727a618a9b55421c73da6228@sha256:864771e8165db16c11a55635df85696f39d91020f258576dd62b7cab0515514f
+FROM public.ecr.aws/e1h7x4a2/plow-cloud-agents:base-67021a7029e33e80bcb27899be6515a5a0e9b37b@sha256:0c3892e93c1a001c61fb7106396e0a4b7e0219008184fd90719caa84a3390ff0
+
+# A cloud install runs this image without compose.yml, so the AGENT_ID set
+# there never reaches it and the base's reporter stands down. Kept here too,
+# which is the only place both paths read.
+ENV AGENT_ID=social-media-agent
 
 COPY runtime/persona.md /opt/hermes/plow-seed/persona.md
 RUN chmod 0644 /opt/hermes/plow-seed/persona.md
