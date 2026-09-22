@@ -217,18 +217,38 @@ def test_x_344_retry_is_bounded_and_backed_off(db):
         db, row["draft_id"], "rate_limited", error_code="344",
         created_at=second_at.isoformat(timespec="seconds"),
     )
-    ready_again = state.publication_gate(
+    exhausted = state.publication_gate(
         db, row["draft_id"], now=second_at + dt.timedelta(seconds=20)
     )
-    assert ready_again["allowed"] is True
-    assert ready_again["attempt_number"] == 3
+    assert exhausted["allowed"] is False
+    assert exhausted["reason"] == "retry_exhausted"
+
+
+def test_x_conclusive_absence_allows_exactly_one_safe_retry(db):
+    row, _ = state.ingest(db, item())
+    state.set_draft(db, row["draft_id"], {"drafts": ["@example Reply"]})
+    state.mark(db, row["draft_id"], "approved")
+    base = dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc)
 
     state.record_publication_attempt(
-        db, row["draft_id"], "rate_limited", error_code="344",
-        created_at=(second_at + dt.timedelta(seconds=20)).isoformat(timespec="seconds"),
+        db, row["draft_id"], "failed", error_code="X_CONCLUSIVE_ABSENCE",
+        detail="reply absent from canonical thread",
+        created_at=base.isoformat(timespec="seconds"),
+    )
+    waiting = state.publication_gate(db, row["draft_id"], now=base + dt.timedelta(seconds=5))
+    assert waiting["reason"] == "retry_backoff"
+    assert waiting["wait_seconds"] == 7
+    ready = state.publication_gate(db, row["draft_id"], now=base + dt.timedelta(seconds=12))
+    assert ready["allowed"] is True
+    assert ready["attempt_number"] == 2
+    assert ready["max_attempts"] == 2
+
+    state.record_publication_attempt(
+        db, row["draft_id"], "failed", error_code="X_GENERIC_CLIENT_ERROR",
+        created_at=(base + dt.timedelta(seconds=12)).isoformat(timespec="seconds"),
     )
     exhausted = state.publication_gate(
-        db, row["draft_id"], now=second_at + dt.timedelta(seconds=40)
+        db, row["draft_id"], now=base + dt.timedelta(seconds=30)
     )
     assert exhausted["allowed"] is False
     assert exhausted["reason"] == "retry_exhausted"

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.2
+
+- Keep one target-scoped X composer for the whole approval cycle and forbid
+  switching between inline/modal composers or opening `/compose/post`.
+- Use browser-native keyboard input once, scope the submit button to that exact
+  composer, and forbid page-injected fetch/XHR hooks.
+- Allow at most two total X submissions: an initial attempt and one safe retry
+  only after the first reply is conclusively absent.
+- Add the audited `X_CONCLUSIVE_ABSENCE` retry classification while keeping
+  ambiguous or uncertain submissions non-retryable.
+- Add an explicit forbidden-output example and enforce at most one optional
+  retry notice followed by one final owner-facing result.
+
 ## 0.4.1
 
 - Make the owner conversation English-only and suppress browser, DOM, tool,

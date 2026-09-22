@@ -106,7 +106,7 @@ x_min_interval_seconds = 60
 linkedin_min_interval_seconds = 45
 x_max_publications_per_24h = 25
 linkedin_max_publications_per_24h = 25
-x_error_344_backoff_seconds = [12, 20]
+x_error_344_backoff_seconds = [12]
 post_fill_settle_seconds = 2
 
 [platforms.x]
@@ -206,18 +206,20 @@ and verifies the result. The agent does not report every click; it responds only
 with the final result or with a single blocker that requires human action. There
 is at most one primary strategy and one safe fallback.
 
-Version 0.4.0 keeps a healthy Camoufox session open and reuses it between
+Version 0.4.2 keeps a healthy Camoufox session open and reuses it between
 monitoring and approvals, avoiding chained logins. It also applies an interval
-between publications and a rolling 24-hour limit. The only automatic resend
-allowed is for X `CreateTweet` error 344: the failure must be confirmed, the
-reply must be absent from the page, and the ledger allows at most two new
-attempts, with waits of 12 and 20 seconds by default.
+between publications and a rolling 24-hour limit. One safe X resend is allowed
+only after the first reply is conclusively absent: either a confirmed
+`CreateTweet` error 344 or a generic failure recorded as
+`X_CONCLUSIVE_ABSENCE`. Ambiguous submissions are never retried. The same
+target-scoped composer is reused after a 12-second backoff.
 
-In the X composer, text is inserted once with `insertText` after a real click
-and after confirming that the field is empty; `fill`, `type`, and `insertText`
-are not mixed. On LinkedIn, native typing remains the primary strategy and
-`insertText` is only the safe fallback. In both cases, the full content is
-compared with the stored draft before sending.
+In the X composer, text is entered once through browser-native keyboard input
+after a real click and after confirming that the field is empty. `fill`, paste,
+DOM assignment, and mixed insertion methods are forbidden. On LinkedIn, native
+typing remains the primary strategy and `insertText` is only the safe fallback.
+In both cases, the full content is compared with the stored draft before
+sending.
 
 X thread pages can contain several tweets and several reply buttons. The agent
 therefore binds the action to exactly one article containing the stored

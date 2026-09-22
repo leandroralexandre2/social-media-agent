@@ -39,7 +39,7 @@ DEFAULT_PUBLISHING_POLICY = {
     "x": {
         "min_interval_seconds": 60,
         "max_publications_per_24h": 25,
-        "error_344_backoff_seconds": [12, 20],
+        "error_344_backoff_seconds": [12],
     },
     "linkedin": {
         "min_interval_seconds": 45,
@@ -520,8 +520,10 @@ def record_publication_attempt(
     """Audit a submit attempt that did not produce a verified publication.
 
     Successful submissions are recorded atomically by ``mark(..., 'published')``.
-    Keeping failures separate lets the agent perform a narrowly bounded X error
-    344 retry without changing the approval state or risking an untracked send.
+    Keeping failures separate lets the agent perform a narrowly bounded X retry
+    without changing the approval state or risking an untracked send. Only
+    error 344 or a conclusively absent generic submission may authorize that
+    single retry; ambiguous outcomes never do.
     """
     if outcome not in PUBLISH_ATTEMPT_OUTCOMES:
         raise StateError(
@@ -646,9 +648,9 @@ def publication_gate(
 ) -> dict[str, Any]:
     """Return the next safe publication action for one approved draft.
 
-    Normal publications are spaced from the last verified success. The only
-    automatic retry is X error 344 after a conclusive API failure and a bounded
-    backoff. Unknown outcomes never become retryable automatically.
+    Normal publications are spaced from the last verified success. X permits
+    one automatic retry after a conclusive 344 or conclusively absent generic
+    failure. Unknown outcomes never become retryable automatically.
     """
     current = get(db, ref)
     if current["status"] != "approved":
@@ -704,21 +706,26 @@ def publication_gate(
     ).fetchall()
     if attempts:
         last = attempts[-1]
-        is_344 = (
-            current["platform"] == "x"
-            and last["outcome"] == "rate_limited"
-            and str(last["error_code"] or "") == "344"
-        )
-        if not is_344:
-            return {**base, "allowed": False, "reason": "manual_review_required"}
-        rate_344_attempts = [
-            row for row in attempts
-            if row["outcome"] == "rate_limited" and str(row["error_code"] or "") == "344"
-        ]
-        backoffs = list(rules.get("error_344_backoff_seconds", []))
-        if len(rate_344_attempts) > len(backoffs):
+        if len(attempts) >= 2:
             return {**base, "allowed": False, "reason": "retry_exhausted"}
-        backoff = backoffs[len(rate_344_attempts) - 1]
+        retryable_x_failure = (
+            current["platform"] == "x"
+            and (
+                (last["outcome"] == "rate_limited"
+                 and str(last["error_code"] or "") == "344")
+                or
+                (last["outcome"] == "failed"
+                 and str(last["error_code"] or "") == "X_CONCLUSIVE_ABSENCE")
+            )
+        )
+        if not retryable_x_failure:
+            return {**base, "allowed": False, "reason": "manual_review_required"}
+        backoffs = list(rules.get("error_344_backoff_seconds", []))
+        if not backoffs:
+            return {**base, "allowed": False, "reason": "retry_exhausted"}
+        # One initial submit plus one safe retry, even when an older config
+        # still contains the pre-0.4.2 two-value 344 backoff list.
+        backoff = backoffs[0]
         elapsed = max(0.0, (moment - _as_utc(last["created_at"])).total_seconds())
         retry_wait = max(0, math.ceil(backoff - elapsed))
         wait = max(retry_wait, interval_wait)
@@ -727,8 +734,8 @@ def publication_gate(
             "allowed": wait == 0,
             "reason": "retry_ready" if wait == 0 else "retry_backoff",
             "wait_seconds": wait,
-            "attempt_number": len(rate_344_attempts) + 1,
-            "max_attempts": len(backoffs) + 1,
+            "attempt_number": 2,
+            "max_attempts": 2,
         }
 
     previous_failure = db.execute(

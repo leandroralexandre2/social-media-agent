@@ -118,7 +118,7 @@ def load_config(path: pathlib.Path) -> dict[str, Any]:
             raise ConfigError(
                 f"publishing.{key} must be an integer between {lower} and {upper}"
             )
-    backoffs = publishing.get("x_error_344_backoff_seconds", [12, 20])
+    backoffs = publishing.get("x_error_344_backoff_seconds", [12])
     if (not isinstance(backoffs, list) or not 1 <= len(backoffs) <= 3
             or any(isinstance(value, bool) or not isinstance(value, int)
                    or not 1 <= value <= 120 for value in backoffs)):

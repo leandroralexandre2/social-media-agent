@@ -4,7 +4,8 @@ plow-credentials
 runtime/social-media.toml
 __pycache__
 .pytest_cache
+pytest-of-root
+commit_sha.tmp
 tests
 *.sqlite3
 *.zip
-

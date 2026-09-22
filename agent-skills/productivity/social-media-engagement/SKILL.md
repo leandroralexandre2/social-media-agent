@@ -84,47 +84,78 @@ On X, scope to exactly one `article` that contains the exact
 control inside that article. Never use the first page-global
 `[data-testid="reply"]`, a list index, or an unscoped coordinate: thread pages
 contain multiple tweets. Stop with `TARGET_NOT_UNIQUE` if the scoped article
-count is not exactly one. On LinkedIn, scope to the element containing both the
-stored author and exact source text. Immediately before submit, verify the
-platform's replying-to context includes the intended author.
+count is not exactly one. Click that scoped reply control once and keep the
+resulting composer for the whole approval cycle. Do not switch between inline
+and modal composers or open `/compose/post`. Also, do not inject or monkey-patch
+`fetch`/XHR hooks into X. On LinkedIn, scope to the element containing
+both the stored author and exact source text. Immediately before submit,
+verify the platform's replying-to context includes the intended author.
 
 Close obstructing overlays before composing. On X, real-click the empty
-contenteditable composer and insert the complete stored reply once with
-`document.execCommand('insertText', false, text)`; never combine it with `fill`
-or `type`. On LinkedIn, use native typing first and that single insertText
-operation only as the safe fallback. After the configured settle delay, verify
-the complete field value exactly and submit once. Reconcile once, read-only:
-capture the direct result URL and verify its parent/source external ID equals
-the stored target. Mark published only with that URL and parent ID. If the
-input or verification strategy fails, record the attempt and `error`; do not
-keep experimenting on the live platform.
+contenteditable composer and enter the complete stored reply once through the
+browser's native keyboard input. Do not use `fill`, paste, or DOM assignment,
+and do not combine typing methods. The text must start with the gate's exact
+`required_mention`; never prepend that mention a second time. After the settle
+delay, compare the complete composer text byte-for-byte with `approved_text`.
+Resolve exactly one visible enabled submit button inside that same composer
+root; never use a page-global `tweetButton`/`tweetButtonInline` selector. On
+LinkedIn, use native typing first and a single `insertText` operation only as
+the safe fallback. Submit once, then perform one read-only reconciliation on
+the canonical target thread. A verified success requires a new reply article
+with the exact approved text, the intended author context, a direct permalink,
+and the correct parent external ID. Do not use the profile Replies tab as a
+substitute for parent verification.
 
-Do not narrate individual browser or ledger operations. Never send messages
-beginning with “let me”, “I need to”, “now I will”, or similar plans. Send one
-compact English result. Use `✅ <id> published.` plus the exact text on success,
+Do not narrate individual browser or ledger operations. Send one compact
+English final result. Use `✅ <id> published.` plus the exact text on success,
 or `❌ <id> was not published. Send RETRY <id> to try again.` on final failure.
 Do not include technical codes or diagnostics unless the owner requests
-`LOGS <id>`. A single `⚠️ First publish attempt failed. I’ll try once more.` is
+`LOGS <id>`. A single `⚠️ First publish attempt failed. I'll try once more.` is
 allowed only before a retry already authorized by the bounded retry policy.
 
-Use at most 12 browser actions, one primary strategy, and one safe fallback for
-one approved publication. Never repeat the same failed action. A 429 other than
-the exact X exception below, hard block, missing Browser use runtime, unresolved
-mention, materially changed context, browser/MCP timeout, or unverified submit
-is terminal for that attempt and must be recorded as `error` without another
-submit.
+Use at most 12 browser actions and two total X submissions per approval cycle:
+one initial submission and, only after conclusive absence, one safe retry in
+the same composer. Never retry an ambiguous result. A 429 other than the exact
+X exception below, hard block, missing Browser use runtime, unresolved mention,
+materially changed context, browser/MCP timeout, or uncertain submit is
+terminal for that cycle and must be recorded as `error` without another submit.
 
-The only automatic resubmit exception is X `CreateTweet` error 344. Retry only
-when the API response conclusively contains code 344 and a live-page check
-confirms that no reply appeared. Record it with `social_state.py record-attempt
-<id> rate_limited --error-code 344`, re-run `publication-gate`, and obey its
-bounded backoff. The defaults permit two retries after the initial attempt at
-12 and 20 seconds. Reuse the same session and composer, verify the stored text
-before every retry, and never re-authenticate. An ambiguous result is not error
-344 and is never automatically retried. A generic X error receives one
-read-only reconciliation: record `failed` only for conclusive absence,
-otherwise `uncertain`, then mark `error`. Only an explicit owner `RETRY <id>`
-starts a new approval cycle, subject to the gate's cooldown.
+An X `CreateTweet` error 344 is retryable only when the response conclusively
+contains code 344 and a live-thread check confirms that the reply is absent.
+Record it with `record-attempt <id> rate_limited --error-code 344`. A generic X
+error or empty successful response is retryable only when the same read-only
+thread check conclusively proves absence; record it as `failed` with
+`--error-code X_CONCLUSIVE_ABSENCE`. Otherwise record `uncertain` and stop.
+Re-run `publication-gate` and obey its backoff before the one safe retry. Reuse
+the same authenticated session, target-scoped composer, exact text, and scoped
+submit button. Never re-authenticate, open a different composer, or perform a
+third submission. After the second failure, mark `error`. Only an explicit
+owner `RETRY <id>` starts a new audited approval cycle.
+Never repeat the same failed action outside this single, explicitly bounded
+submission retry.
+
+## Explicitly forbidden output pattern
+
+The following is a real policy violation. Never produce anything resembling
+this narrated stream, even when split across multiple messages:
+
+```text
+Valid state to approve.
+Gate approved. Now open browser, log in, and publish.
+Not redirected to login — need to check if already logged in or not.
+Logged in and landed on the target status page directly.
+Now find the article containing this specific status...
+There's already an inline compose box present...
+Empty field confirmed. Now click it...
+```
+
+Every line above is internal reasoning or tool narration and belongs only in
+the ledger. If a draft message starts with “Now”, “Let's”, “Confirmed”, “I need
+to”, or “I'll try”, suppress it. Per approval cycle, send at most two messages
+to the owner, in this order: (1) the optional authorized retry line
+`⚠️ First publish attempt failed. I'll try once more.`; (2) exactly one final
+success or failure template. There is no initial “trying now” message and no
+technical summary unless the owner explicitly requests `LOGS <id>`.
 
 If verification reveals that a response was attached to the wrong parent,
 record it and stop with `MISROUTED_PUBLICATION`. If it was already recorded as
@@ -148,3 +179,39 @@ For a public X reply, use the exact stored `@handle`. For a LinkedIn public
 reply, type `@Full Name`, choose the matching mention suggestion, and verify the
 mention before submit. If the exact person cannot be selected, stop with
 `MENTION_UNRESOLVED`. A direct message does not need an @-mention.
+
+## Explicitly forbidden output pattern
+
+The following is a real example of a policy violation. Never produce anything
+resembling this list of narrated steps, even split across multiple messages:
+
+```text
+Valid state to approve.
+Gate approved. Now open browser, log in, and publish.
+Not redirected to login — need to check if already logged in or not.
+Logged in and landed on the target status page directly.
+Now find the article containing this specific status...
+There's already an inline compose box present...
+Empty field confirmed. Now click it...
+```
+
+Every line above is internal reasoning or a tool-call narration and must never
+reach the owner conversation, whether as one message or as a stream of
+messages. If you notice yourself about to write "Now ...", "Let's ...",
+"Confirmed: ...", "I'll try ...", or any present-tense description of a
+browser/tool action, stop and suppress it. That content belongs only in the
+internal ledger (`social_state.py record-attempt` / `history`), never in a
+message to the owner.
+
+Only three owner-facing messages are allowed per approval cycle, and only in
+this exact order:
+
+1. (optional, only if a retry is authorized by policy) one line:
+   `⚠️ First publish attempt failed. I'll try once more.`
+2. The single final result:
+   `✅ <id> published.` + exact text, **or**
+   `❌ <id> was not published. Send RETRY <id> to try again.`
+
+Nothing else. Not a "trying now" message, not a play-by-play, not a summary of
+what was checked. If you are unsure whether a line is safe to send, do not send
+it — log it internally instead.

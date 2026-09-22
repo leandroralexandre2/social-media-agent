@@ -41,9 +41,9 @@ def test_runtime_persona_and_skill_define_fast_bounded_publication():
     persona = (ROOT / "runtime/persona.md").read_text()
     skill = (ROOT / "agent-skills/productivity/social-media-engagement/SKILL.md").read_text()
     assert "do not narrate browser clicks" in persona
-    assert "one primary interaction strategy and one safe fallback" in persona
+    assert "two total X submissions per approval cycle" in persona
     assert "Do not narrate individual browser" in skill
-    assert "submit once" in skill
+    assert "submit once" in skill.lower()
     assert "TARGET_NOT_UNIQUE" in persona
     assert "[data-testid=\"reply\"]" in skill
     assert "--parent-external-id" in persona
@@ -58,9 +58,11 @@ def test_runtime_contract_reuses_sessions_and_bounds_x_344_retries():
     assert "publication-gate" in persona
     assert "SESSION_NOT_PERSISTED" in persona
     assert "record-attempt <id> rate_limited" in persona
-    assert "Never mix X" in persona
-    assert "two retries after the initial attempt" in skill
-    assert "never re-authenticate" in skill
+    assert "browser-native keyboard input" in persona
+    assert "two total X submissions per approval cycle" in skill
+    assert "X_CONCLUSIVE_ABSENCE" in skill
+    assert "do not inject or monkey-patch" in skill.lower()
+    assert "Never re-authenticate" in skill
 
 
 def test_runtime_persona_and_skill_follow_browser_use_without_loops():
@@ -87,12 +89,14 @@ def test_owner_conversation_is_compact_and_hides_tool_narration():
     skill = (ROOT / "agent-skills/productivity/social-media-engagement/SKILL.md").read_text()
     assert "The owner conversation is a concise control interface" in persona
     assert "All messages to the owner are in English" in persona
-    assert "First publish attempt failed. I’ll try once more." in persona
+    assert "First publish attempt failed. I'll try once more." in persona
     assert "✅ SM-000008 published." in persona
     assert "❌ SM-000008 was not published." in persona
     assert "Do not expose technical error codes" in persona
-    assert "Never send messages\nbeginning with “let me”" in skill
+    assert "If a draft message starts with" in skill
     assert "RESPONSE <id>" in skill
+    assert "Explicitly forbidden output pattern" in skill
+    assert "at most two messages" in skill
 
 
 def test_release_refreshes_only_agent_owned_live_behavior_files():

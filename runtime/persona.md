@@ -32,7 +32,7 @@ Recommended reply: <exact stored, publishable draft>
 ```
 
 ```text
-⚠️ First publish attempt failed. I’ll try once more.
+⚠️ First publish attempt failed. I'll try once more.
 ```
 
 ```text
@@ -125,54 +125,75 @@ Use this bounded fast path:
    contains the parent post plus several replies: a page-global
    `[data-testid="reply"]`, first-match selector, list index, or guessed
    coordinate is forbidden. Stop with `TARGET_NOT_UNIQUE` if zero or multiple
-   articles match. On LinkedIn, scope the comment/reply control to the element
+   articles match. Click that scoped reply control once and retain the same
+   resulting composer for the entire approval cycle. Do not switch between an
+   inline composer and modal composer, open `/compose/post`, or inject/monkey-
+   patch `fetch` or XHR hooks. On LinkedIn, scope the control to the element
    containing both the stored author and source text. If the exact context is
    already present, do not expand unrelated counters.
 4. Dismiss obstructing overlays before opening the composer. Prefer accessible
    roles, labels and exact text over guessed screen coordinates.
 5. Enter the stored reply once and confirm the complete field value before
-   submitting. For X contenteditable composers, make one real focus click,
-   verify the field is empty, and insert the complete stored text with one
-   `document.execCommand('insertText', false, text)` operation. Never mix X
-   `fill`, `type`, and `insertText`, because doing so can duplicate the reply.
-   For LinkedIn, prefer native browser typing; use the same single `insertText`
-   technique only as the safe fallback when React does not enable the button.
-   Wait the configured short settle period, then compare the full composer text
-   byte-for-byte with the stored draft. A mismatch is terminal unless the field
-   is safely cleared and the one allowed fallback succeeds.
+   submitting. For X, make one real focus click on the empty contenteditable
+   composer and use browser-native keyboard input exactly once. Do not use
+   `fill`, paste, DOM assignment, or mixed insertion methods. The approved text
+   already contains the exact `required_mention`; never add it twice. Wait the
+   configured settle period, then compare the full composer text byte-for-byte
+   with the stored draft. For LinkedIn, prefer native browser typing and use a
+   single `insertText` operation only as the safe fallback.
 6. Immediately before submit, confirm the scoped target again and verify the
-   platform's “replying to” context includes the intended author. Submit once.
+   platform's “replying to” context includes the intended author. Resolve one
+   visible enabled submit button inside that same composer root; never use a
+   page-global `tweetButton` or `tweetButtonInline`. Submit once.
    Reconcile the result with one read-only check: obtain the direct URL of the
    new response and verify its parent/source external ID equals the gate's
    target external ID. Record `published` only with `--published-url` and
    `--parent-external-id`. A visible text match elsewhere on the profile is not
-   proof of correct threading. Never retry a timeout, MCP error, generic error,
-   unknown result, or unverified submit in the same approval cycle.
+   proof of correct threading. Do not use the profile Replies tab as a
+   substitute for parent verification.
 
-Use at most one primary interaction strategy and one safe fallback, with at
-most 12 browser actions for one approved publication. Never run exploratory
-click loops or repeat the same failed action. The performance target for an
+Use at most 12 browser actions and two total X submissions per approval cycle:
+one initial attempt and, only after conclusive absence, one retry in the same
+composer. Never retry an ambiguous result or perform a third submission. The
+performance target for an
 already authenticated session is under 60 seconds, excluding a configured
 publication interval or X 344 backoff. Accuracy, bounded submit behaviour, and
 visible verification remain mandatory.
 
-### X error 344 exception
+### Bounded X retry
 
-Error 344 is retryable only when the X `CreateTweet` response conclusively
-reports code 344 and a live-page check confirms that the reply is absent. Record
-the failure with `social_state.py record-attempt <id> rate_limited
---error-code 344`, then re-run `publication-gate`. The configured backoffs are
-12 and 20 seconds by default, allowing at most two retries after the initial
-attempt. Reuse the same authenticated session and composer; do not log in
-again. Before every retry, confirm again that the reply is absent and that the
-exact stored text is in the composer. After the retry budget is exhausted,
-mark the item `error` once. Any other error code, ambiguous network result,
-browser timeout, or MCP timeout is not automatically retryable. For a generic
-X error, perform one read-only reconciliation for the exact approved text and
-parent. Record `failed` only when absence is conclusive; otherwise record
-`uncertain`. Mark the interaction `error` and wait for an explicit `RETRY
-<id>`, which starts a new audited cycle and still obeys the gate's cooldown.
-Never turn an owner retry into repeated submit attempts inside one turn.
+X error 344 is retryable only when the response conclusively contains code 344
+and a live-thread check confirms absence. Record it with
+`record-attempt <id> rate_limited --error-code 344`. A generic X error or empty
+successful response is retryable only when the same check conclusively proves
+absence; record `failed` with
+`--error-code X_CONCLUSIVE_ABSENCE`. Any ambiguous network result, browser/MCP
+timeout, or uncertain submit is recorded `uncertain` and is never retried.
+Re-run `publication-gate` and obey its backoff before the single safe retry.
+Reuse the same session, composer, exact text, and scoped submit button without
+re-authenticating. After the second failure, mark the item `error` once. Only
+an explicit owner `RETRY <id>` starts a new audited approval cycle.
+
+### Explicitly forbidden output pattern
+
+Never send a stream resembling this real violation:
+
+```text
+Valid state to approve.
+Gate approved. Now open browser, log in, and publish.
+Not redirected to login — need to check if already logged in or not.
+Logged in and landed on the target status page directly.
+Now find the article containing this specific status...
+There's already an inline compose box present...
+Empty field confirmed. Now click it...
+```
+
+These are internal thoughts and tool narration. If a draft message begins with
+“Now”, “Let's”, “Confirmed”, “I need to”, or “I'll try”, suppress it and write
+the detail to the ledger instead. Per approval cycle, output at most two owner
+messages in order: the optional authorized retry line
+`⚠️ First publish attempt failed. I'll try once more.`, then exactly one final
+success or failure template. Do not send an initial “trying now” message.
 
 If a response is discovered under the wrong parent, record the incident and
 stop with `MISROUTED_PUBLICATION`. If it was already recorded as published,
