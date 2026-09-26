@@ -69,14 +69,14 @@ def utcnow() -> str:
 def default_db_path() -> pathlib.Path:
     if value := os.environ.get("SOCIAL_STATE_DB"):
         return pathlib.Path(value).expanduser()
-    home = pathlib.Path(os.environ.get("HERMES_HOME", pathlib.Path.home() / ".hermes"))
-    return home / "state" / "social-media.sqlite3"
+    home = pathlib.Path(os.environ.get("SOCIAL_HOME", "/var/lib/plow/social-media"))
+    return home / "state.sqlite3"
 
 
 def default_config_path() -> pathlib.Path:
     if value := os.environ.get("SOCIAL_MEDIA_CONFIG"):
         return pathlib.Path(value).expanduser()
-    home = pathlib.Path(os.environ.get("HERMES_HOME", pathlib.Path.home() / ".hermes"))
+    home = pathlib.Path(os.environ.get("SOCIAL_HOME", "/var/lib/plow/social-media"))
     return home / "social-media.toml"
 
 

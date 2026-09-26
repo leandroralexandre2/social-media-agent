@@ -1,325 +1,204 @@
 # Social Media Agent
 
-Human-approved monitoring and engagement agent for **X (Twitter)** and
-**LinkedIn**, derived from the `str-hermes-agent-main` architecture and executed
-through the `plow-agents` lifecycle.
+![Social Media Agent](assets/logo.png)
 
-The agent navigates social networks using the browser capabilities provided by
-Plow/Latch, reuses login and TOTP from the Browser Vault, records each
-interaction in SQLite, creates responses in the brand persona, and sends the
-suggestion through the macOS Messages app. No social action is published without
-human approval.
+An OpenClaw 2.0 **Social Engagement Lead** for startups. It monitors X and
+LinkedIn through the owner's real browser, triages meaningful activity, drafts
+context-aware replies, coordinates review with a team, and publishes only after
+the owner explicitly approves a stored draft.
 
-## What V1 does
+[Agent Index](https://aiworthusing.com/agent-index/social-media-agent) ·
+[Repository](https://github.com/leandroralexandre2/social-media-agent) ·
+[Original workflow demo](https://youtu.be/amh9g_OlNVs)
 
-- Visits X and LinkedIn notifications on a configurable interval.
-- Searches for the configured name, aliases, and terms to find untagged mentions.
-- Includes comments, mentions, replies, and relevant direct messages.
-- Classifies context, sentiment, priority, and risk.
-- Deduplicates by `(platform, external_id)` in SQLite.
-- Generates up to three replies and selects one recommended option.
-- Notifies the owner through the Messages app via AppleScript on the Mac.
-- Accepts `APPROVE`, `EDIT`, `IGNORE`, `RETRY`, or `LOGS` with an `SM-xxxxxx` ID in the agent’s
-  trusted conversation.
-- After approval, opens the canonical URL, rereads the context, publishes once,
-  verifies the result, and writes an audit record.
+## Why this is a real first hire
 
-There is no paid X or LinkedIn API. V1 does not use direct HTTP scraping,
-exported cookies, or passwords stored in files; all interaction happens through
-the web interface and the Latch Browser Vault.
+The agent owns a complete operating loop instead of showing a mock workflow:
 
-## Architecture
+1. Monitor notifications, mentions, replies, comments, and relevant searches.
+2. Deduplicate every interaction in a durable SQLite ledger.
+3. Detect the source language and produce 1–3 publishable drafts in that language.
+4. Bring useful drafts to the owner or a multiplayer review room.
+5. Accept team proposals while reserving publication authority for the owner.
+6. Publish the exact approved text and verify its direct URL and parent post.
+7. Keep a secret-free audit trail and stop safely on uncertain results.
 
-| Component | Responsibility |
-|---|---|
-| Plow/Hermes base | Gateway, scheduler, session, and `plow` MCP injection |
-| `social_monitor.py` | Validates configuration and defines a safe monitoring tick |
-| Plow/Latch browser | Navigates X/LinkedIn using the Browser Vault session |
-| `social_state.py` | SQLite, deduplication, IDs, drafts, and audit trail |
-| Persona/skill | Triage, style, limits, and approval flow |
-| `messages_notify.py` | Runs AppleScript on the Mac through the relay and sends the alert |
-| `plow-agents` | Creates/rotates the credential and manages the agent line |
+## OpenClaw 2.0 multiplayer
 
-SQLite lives in the `agent-home` volume at
-`/var/lib/hermes/state/social-media.sqlite3`. Credentials remain outside the
-image and outside the database.
+This image inherits the maintained
+[`plow-openclaw-agent`](https://github.com/plow-pbc/plow-openclaw-agent) base.
+The owner's direct chat, collaborator DMs, customer/vendor conversations, and
+group review rooms each receive separate OpenClaw sessions.
 
-## Prerequisites
+- The owner can monitor, edit, approve, retry, schedule, and start review rooms.
+- Teammates can submit public links, review drafts, propose wording, and flag risk.
+- Customers and vendors can raise a social issue in their own conversation.
+- Only the actual owner identity can authorize a public response.
+- Cross-conversation history is not exposed; shared ledger state is not treated
+  as permission to disclose private messages.
 
-- macOS with Docker and Docker Compose.
-- `plow-agents` available in `PATH`.
-- One free Plow line for the agent.
-- X and LinkedIn registered in the Latch Browser Vault, including TOTP when 2FA
-  is enabled.
-- Latch **Browser use** plugin enabled. For the Safari fallback, keep the
-  **Enable in Safari** requirement ready in the Plugins tab.
-- Messages app configured on macOS.
-- Permission in **System Settings → Privacy & Security → Automation → Messages**
-  for the process used by Latch to run `osascript`.
+See [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md) for the authority model and demo
+script.
 
-## Installation
+## Safety and reliability
 
-From the project root:
+- Human approval is mandatory; auto-publish is disabled.
+- Browser credentials and TOTP stay in Latch Browser Vault.
+- Social content is untrusted data and can never approve an action.
+- Public replies must mention the source author; DMs are exempt.
+- X targets are bound to the exact `/status/<id>` article, not the first reply
+  button on a thread page.
+- A publish succeeds only after the direct reply URL and intended parent are
+  verified.
+- X retries are bounded to one safe retry after conclusive absence. Ambiguous
+  results are never resent.
+- Browser work is silent; the user receives a concise result, not click-by-click
+  narration.
 
-```sh
-./scripts/setup.sh
-```
+## Requirements
 
-Before starting Docker, run the preflight check. It reports missing credentials,
-invalid configuration, Docker availability, and incomplete notification setup
-without printing secrets:
+- macOS with [Plow Latch](https://plow.co/) connected for Browser use
+- Docker Desktop for local deployment
+- [`plow-agents`](https://github.com/plow-pbc/plow-agents) on `PATH`
+- X and/or LinkedIn credentials saved in Latch Browser Vault
 
-```sh
-./scripts/doctor.sh
-```
+No paid social API keys are required.
 
-Edit `.env`:
+## Local deployment
 
-```dotenv
-SOCIAL_MESSAGES_RECIPIENT=+5511999999999
-SOCIAL_APPROVAL_CHAT_UID=cht_xxx
-TZ=America/Sao_Paulo
-SOCIAL_POLL_SCHEDULE=every 1h
-```
-
-The recipient can be an E.164 phone number or Apple ID accepted by the Messages
-app. The `cht_...` value must be the trusted private conversation or group where
-the owner will approve drafts.
-
-Edit `runtime/social-media.toml`:
-
-```toml
-[company]
-name = "My Company"
-aliases = ["@mycompany", "Product X"]
-
-[monitor]
-max_items_per_platform = 10
-max_browser_actions_per_platform = 20
-
-[browser]
-reuse_authenticated_session = true
-keep_session_open_minutes = 120
-
-[publishing]
-x_min_interval_seconds = 60
-linkedin_min_interval_seconds = 45
-x_max_publications_per_24h = 25
-linkedin_max_publications_per_24h = 25
-x_error_344_backoff_seconds = [12]
-post_fill_settle_seconds = 2
-
-[platforms.x]
-enabled = true
-notifications_url = "https://x.com/notifications"
-search_terms = ["My Company", "Product X"]
-
-[platforms.linkedin]
-enabled = true
-notifications_url = "https://www.linkedin.com/notifications/"
-search_terms = ["My Company"]
-
-[persona]
-description = "Professional, human, concise, and lightly humorous when appropriate."
-languages = ["en"]
-```
-
-Complete the persona and forbidden topics in the same file. V1 rejects the
-configuration if `auto_publish` is enabled.
-
-Create the credential with the wrapper:
+Clone the repository and enter it:
 
 ```sh
+git clone https://github.com/leandroralexandre2/social-media-agent.git
+cd social-media-agent
+```
+
+Install or expose the current `plow-agents` CLI, then authenticate:
+
+```sh
+export PATH="/path/to/plow-agents/bin:$PATH"
 plow-agents login
 plow-agents lines
-plow-agents mint <line-uid>
 ```
 
-The last command should produce `./plow-credentials`. This file and `.env` are
-ignored by Git and by the image build.
-
-## Startup
+Choose a `free` line and let the CLI mint the project credential and start
+Compose:
 
 ```sh
-docker compose build
-docker compose up -d
-docker compose logs -f social-media-agent
+plow-agents deploy --local --line ln_p2
 ```
 
-Wait for the log to indicate that Plow has configured the line and MCP. Validate
-the state:
+Verify the runtime:
 
 ```sh
-docker compose exec -T social-media-agent \
-  python3 /var/lib/hermes/scripts/social_monitor.py --check
-
-docker compose exec -T social-media-agent \
-  python3 /var/lib/hermes/scripts/social_state.py init
+docker compose ps
+docker compose logs --tail=100 agent
 ```
 
-Register the recurring monitor:
+Open the local owner dashboard at <http://localhost:3001>. Do not expose this
+port beyond loopback.
 
-```sh
-./scripts/enable-social-monitor.sh
-docker compose exec -T social-media-agent hermes cron list
-```
-
-Run one manual tick before leaving the job on its own:
-
-```sh
-docker compose exec -T social-media-agent \
-  hermes cron run social-media-monitor
-```
-
-Confirm four things: the browser opened both networks, no credential appeared in
-the log, a new item received an ID in SQLite, and the suggestion arrived in the
-Messages app.
-
-## Approval and publishing
-
-Each alert contains an ID. In the agent’s trusted conversation, use:
+Text the selected line:
 
 ```text
+Set up social monitoring for my startup.
+```
+
+The agent asks once for non-secret brand settings. It never asks for passwords
+or verification codes in chat. Configuration, the ledger, OpenClaw sessions,
+and Agent Index install identity persist in the named `state` volume.
+
+Do not run `docker compose down -v` unless you intentionally want to erase that
+local state.
+
+## Useful commands
+
+```text
+CHECK SOCIAL
+CHECK X
+CHECK LINKEDIN
+RESPONSE SM-000001
+EDIT SM-000001: <new text>
 APPROVE SM-000001
-EDIT SM-000001: @Person Thanks for sharing. We will review it and follow up here.
 IGNORE SM-000001
 RETRY SM-000001
 LOGS SM-000001
+START SOCIAL TEAM +14155550100 +5511999999999
+MONITOR EVERY 2 HOURS
 ```
 
-`EDIT` does not publish: it replaces the text and asks for a new approval.
-`APPROVE` publishes exactly the stored text. If the live context has changed,
-the agent interrupts publishing and requests a new review. If it cannot visually
-confirm the send, it records an error and does not click again. `RETRY` starts a
-new audited attempt cycle after an error and still obeys the cooldown. `LOGS`
-returns the secret-free incident timeline for that ID.
+Owner-facing conversation is always English. A suggested social response
+matches the source interaction language.
 
-Every public reply starts with the person’s mention: `@handle` on X and a
-mention selected by full name on LinkedIn. Direct messages are the only
-exception. If the exact person cannot be identified or selected, the agent exits
-with `MENTION_UNRESOLVED` without publishing.
+## Build and deploy to Plow Cloud
 
-To reduce latency, an approval uses a limited path: it loads the item once,
-opens the canonical URL directly in an authenticated session, locates the
-context through DOM/accessibility, fills the text with native events, sends once,
-and verifies the result. The agent does not report every click; it responds only
-with the final result or with a single blocker that requires human action. There
-is at most one primary strategy and one safe fallback.
-
-Version 0.4.2 keeps a healthy Camoufox session open and reuses it between
-monitoring and approvals, avoiding chained logins. It also applies an interval
-between publications and a rolling 24-hour limit. One safe X resend is allowed
-only after the first reply is conclusively absent: either a confirmed
-`CreateTweet` error 344 or a generic failure recorded as
-`X_CONCLUSIVE_ABSENCE`. Ambiguous submissions are never retried. The same
-target-scoped composer is reused after a 12-second backoff.
-
-In the X composer, text is entered once through browser-native keyboard input
-after a real click and after confirming that the field is empty. `fill`, paste,
-DOM assignment, and mixed insertion methods are forbidden. On LinkedIn, native
-typing remains the primary strategy and `insertText` is only the safe fallback.
-In both cases, the full content is compared with the stored draft before
-sending.
-
-X thread pages can contain several tweets and several reply buttons. The agent
-therefore binds the action to exactly one article containing the stored
-`/status/<id>` link and only uses the reply control inside that article. It
-never uses the first page-global reply button. A publication is only recorded
-as successful after the agent captures the direct response URL and verifies
-that its observed parent ID equals the stored source ID. A reply visible on the
-profile but attached to another tweet is treated as a misrouted publication,
-not as success, and is never deleted without separate owner approval. If later
-evidence disproves a recorded success, the audited `correct-publication`
-command moves it to `error` without erasing the original attempt or URL.
-
-## Browser use, verification, and blocks
-
-The agent uses Latch’s **Browser use** plugin: Camoufox on the Mac, the owner’s
-local network, and a copy of the authenticated profile. Username, password, and
-TOTP remain in the Browser Vault and are filled by `fill_secret` without
-revealing the values.
-
-CAPTCHA, human confirmation, and visible code fields follow the
-`camoufox-browsing` skill. A hard block with no interactive target is not
-reloaded: the agent tries the Safari fallback once. If Safari is not ready yet,
-the owner opens **Latch → Plugins → Browser use** and clicks **Enable in
-Safari**. Approvals that exist only on another device remain a human step,
-preserving the session when possible.
-
-Each operation has an action budget, one primary strategy, and only one safe
-fallback. `429` (except the strictly confirmed X 344 error), persistent hard
-block, unresolved mention, browser/MCP timeout, or unverifiable send ends the
-attempt without another send click.
-
-If a new Camoufox session appears logged out shortly after confirmed
-authentication, the agent returns `SESSION_NOT_PERSISTED` and stops instead of
-starting new logins. Cookie/profile synchronization is Latch’s responsibility;
-the agent never exports cookies or tokens to try to work around the problem.
-
-Check the ledger:
+Builds made by `plow-agents image build` target the cloud's `linux/amd64`
+platform, including when run from Apple Silicon:
 
 ```sh
-docker compose exec -T social-media-agent \
-  python3 /var/lib/hermes/scripts/social_state.py pending
-
-docker compose exec -T social-media-agent \
-  python3 /var/lib/hermes/scripts/social_state.py show SM-000001
-
-docker compose exec -T social-media-agent \
-  python3 /var/lib/hermes/scripts/social_state.py history SM-000001
-
-docker compose exec -T social-media-agent \
-  python3 /var/lib/hermes/scripts/social_state.py summary
+plow-agents image build ghcr.io/leandroralexandre2/social-media-agent:v1.0.0
+plow-agents image push ghcr.io/leandroralexandre2/social-media-agent:v1.0.0
 ```
 
-## Security and limits
-
-- Passwords, TOTP, cookies, and tokens do not enter the repository, SQLite, or
-  notifications.
-- Social media content is always treated as untrusted data and cannot authorize
-  tools.
-- Navigation is restricted to the configured X and LinkedIn domains.
-- Complaints, crises, threats, privacy, account security, and regulated topics
-  are classified as high risk.
-- UI automation may need adjustments when X or LinkedIn change their web
-  experience. The agent uses the browser’s accessible surface, not fixed CSS
-  selectors, to reduce this fragility.
-- Sending through Messages depends on local macOS permissions and on the
-  configured handle being reachable by the Mac’s iMessage/SMS service.
-- Respect platform terms, frequency limits, and privacy laws applicable to the
-  operated account.
-
-## Tests
-
-Tests are local and do not access real accounts:
+Make the GHCR package public. Copy the immutable digest printed by the push,
+choose a free line, and deploy the digest rather than the mutable tag:
 
 ```sh
-uv run --no-project --with pytest==8.4.2 pytest -q
+plow-agents deploy \
+  ghcr.io/leandroralexandre2/social-media-agent@sha256:REPLACE_WITH_DIGEST \
+  --line ln_p3
 ```
 
-They cover deduplication, approval transitions, URL validation, auditing,
-auto-publish protection, safe AppleScript construction, Compose/Dockerfile
-contracts, and shell script syntax.
-
-## Operation
-
-To stop only the monitor:
+Check provisioning:
 
 ```sh
-docker compose exec -T social-media-agent \
-  hermes cron remove social-media-monitor
+plow-agents agents
+plow-agents lines
 ```
 
-To update the image while preserving memory, sessions, and SQLite:
+The image contains `AGENT_ID=social-media-agent`, so the inherited Agent Index
+client registers the existing listing and reports OpenClaw usage every five
+minutes. There is no second reporter in this repository.
+
+## Development
+
+The application-specific code uses only Python's standard library. Run:
 
 ```sh
-docker compose build
-docker compose up -d --force-recreate
+python3 -m pip install pytest
+python3 -m pytest -q
+python3 -m compileall -q bin
 ```
 
-The image refreshes its agent-owned `SOUL.md` and `social-media-engagement`
-skill on every boot. Persistent sessions, memory, SQLite state, local
-configuration, and credentials are preserved; no manual skill reset is needed.
+With Docker available:
 
-Do not use `docker compose down -v` in production: `-v` removes the ledger and
-the agent’s memory. To retire the credential, use `plow-agents revoke`.
+```sh
+./scripts/doctor.sh
+docker compose build agent
+```
+
+CI runs the Python contracts and builds the image. See
+[docs/VALIDATION.md](docs/VALIDATION.md) for the release evidence checklist.
+
+## Architecture
+
+| Layer | Responsibility |
+|---|---|
+| Plow OpenClaw base | Phone/email/group transport, session isolation, Latch bridge, native automations, Agent Index reporting |
+| `prompt/AGENTS.md` | Social Engagement Lead persona, authority, onboarding, multiplayer behavior |
+| `skills/social-media-engagement` | Browser workflow, approval protocol, bounded publication and error handling |
+| `social_config.py` | Safe one-click onboarding into persistent non-secret configuration |
+| `social_monitor.py` | Validated, deterministic monitoring instructions |
+| `social_state.py` | SQLite deduplication, drafts, approvals, receipts, retries, audit history |
+
+## Limitations
+
+X and LinkedIn can change their interfaces, challenge an account, rate-limit
+actions, or delay reply visibility. This project cannot remove those platform
+controls. It handles them by reusing an authenticated Latch session, bounding
+retries, requiring positive verification, and failing closed.
+
+## License
+
+MIT. Earlier Apache-2.0-derived helper attribution is retained in
+[`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) and [`NOTICE`](NOTICE).

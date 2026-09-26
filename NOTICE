@@ -1,6 +1,11 @@
 Social Media Agent
-Derived from the str-hermes-agent-main architecture and designed for the
-plow-agents / Plow Hermes runtime.
+Copyright 2026 Leandro Alexandre
 
-This product includes software developed under the Apache License 2.0.
+This OpenClaw 2.0 edition is licensed under the MIT License.
 
+The durable social ledger and policy helpers evolved from the earlier
+str-hermes-agent-based edition. Apache-2.0 attribution for those portions is
+preserved in LICENSES/Apache-2.0.txt.
+
+The runtime image inherits Plow's plow-openclaw-agent base. Its third-party
+software and licenses remain part of that base image and its source project.

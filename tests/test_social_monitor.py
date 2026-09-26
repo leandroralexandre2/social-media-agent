@@ -51,7 +51,7 @@ def test_prompt_carries_surfaces_dedup_and_human_gate(tmp_path):
     assert "inserted=false" in prompt
     assert "Browser Vault" in prompt
     assert "Never like, repost, follow, connect" in prompt
-    assert "trusted owner conversation" in prompt
+    assert "actual owner identity" in prompt
     assert "auto_publish is false" in prompt
     assert "Browser use" in prompt
     assert "camoufox-browsing" in prompt
@@ -71,6 +71,8 @@ def test_prompt_carries_surfaces_dedup_and_human_gate(tmp_path):
     assert "Every draft must be real text" in prompt
     assert "Never send progress messages" in prompt
     assert "Do not expose technical error codes" in prompt
+    assert "/opt/social-media/bin/social_state.py" in prompt
+    assert "Team members may review" in prompt
 
 
 def test_placeholder_company_refuses_to_run(tmp_path):

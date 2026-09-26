@@ -1,25 +1,24 @@
 services:
-  social-media-agent:
+  agent:
     build: .
-    image: social-media-agent:local
+    image: social-media-agent:openclaw-local
     container_name: social-media-agent
     restart: unless-stopped
-    pull_policy: never
-    env_file:
-      - ./plow-credentials
-    environment:
-      AGENT_ID: social-media-agent
-      HERMES_UID: "1000"
-      HERMES_GID: "1000"
-      TZ: ${TZ:-America/Sao_Paulo}
-      SOCIAL_MEDIA_CONFIG: /opt/plow/social/config/social-media.toml
-      SOCIAL_MESSAGES_RECIPIENT: ${SOCIAL_MESSAGES_RECIPIENT:-}
-      SOCIAL_APPROVAL_CHAT_UID: ${SOCIAL_APPROVAL_CHAT_UID:-}
-      SOCIAL_POLL_SCHEDULE: ${SOCIAL_POLL_SCHEDULE:-every 1h}
+    env_file: ./plow-credentials
+    ports:
+      - "127.0.0.1:3001:3001"
     volumes:
-      - agent-home:/var/lib/hermes
-      - ./runtime/social-media.toml:/opt/plow/social/config/social-media.toml:ro
+      - state:/var/lib/plow
     stop_grace_period: 35s
 
+  # Local-only proxy for OpenClaw's owner dashboard. Anyone who can reach this
+  # loopback port can administer this local development agent.
+  dev-dashboard:
+    image: caddy:2@sha256:14a9c00d4e833ebc2b65d36515b37bde3b73f0b323a2663aaafc88953d8c4e3f
+    network_mode: service:agent
+    depends_on: [agent]
+    volumes:
+      - ./dev/Caddyfile:/etc/caddy/Caddyfile:ro
+
 volumes:
-  agent-home:
+  state:

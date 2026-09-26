@@ -1,6 +1,4 @@
-.env
-plow-credentials
-runtime/social-media.toml
+plow-credentials*
 __pycache__/
 .pytest_cache/
 pytest-of-root/

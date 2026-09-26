@@ -1,23 +1,23 @@
-setup:
-    ./scripts/setup.sh
-
 doctor:
     ./scripts/doctor.sh
 
+test:
+    python3 -m pytest -q
+
 build:
-    docker compose build
+    docker compose build agent
 
 up:
-    docker compose up -d
+    docker compose up -d --build
+
+logs:
+    docker compose logs -f agent
 
 down:
     docker compose down
 
 restart:
-    docker compose up -d --force-recreate
+    docker compose up -d --build --force-recreate agent dev-dashboard
 
-enable:
-    ./scripts/enable-social-monitor.sh
-
-test:
-    uv run --no-project --with pytest==8.4.2 pytest -q
+cloud-image tag:
+    plow-agents image build ghcr.io/leandroralexandre2/social-media-agent:{{tag}}

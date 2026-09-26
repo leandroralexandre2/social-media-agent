@@ -3,6 +3,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+BIN = ROOT / "bin"
+if str(BIN) not in sys.path:
+    sys.path.insert(0, str(BIN))
 
 
 def load_script(name: str):
@@ -14,4 +17,3 @@ def load_script(name: str):
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
-

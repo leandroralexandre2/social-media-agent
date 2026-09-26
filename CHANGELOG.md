@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0 - OpenClaw 2.0 multiplayer migration
+
+- Replaced the Hermes runtime with the current digest-pinned Plow OpenClaw base.
+- Added isolated multiplayer review rooms with owner-only publish authority.
+- Added one-click conversational onboarding persisted under `/var/lib/plow`.
+- Reused the base Agent Index reporter under the existing `social-media-agent` ID.
+- Removed AppleScript Messages routing, `.env` recipient settings, and custom boot hooks.
+- Preserved the audited social ledger, exact-target publishing, and bounded X retry.
+- Added OpenClaw Compose, local dashboard proxy, CI, validation, and cloud release docs.
+
 ## 0.4.2
 
 - Keep one target-scoped X composer for the whole approval cycle and forbid
