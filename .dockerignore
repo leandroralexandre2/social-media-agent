@@ -8,3 +8,6 @@ tests
 *.sqlite3
 *.zip
 agent_index_client.py
+scripts/doctor.sh
+.env
+.env.*
