@@ -7,3 +7,4 @@ commit_sha.tmp
 tests
 *.sqlite3
 *.zip
+agent_index_client.py
