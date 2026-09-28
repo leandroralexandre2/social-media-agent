@@ -95,6 +95,37 @@ docker compose ps
 docker compose logs --tail=100 agent
 ```
 
+### Apple Silicon Macs (M1/M2/M3/M4)
+
+The Plow base image is `linux/amd64` only. Docker Desktop runs it under
+Rosetta by default, and Rosetta lacks the `openat2` syscall that OpenClaw's
+state migration needs. The container then restart-loops with:
+
+```text
+Failed migrating legacy shared auth store: the Gateway or another SQLite
+maintenance command owns this state directory.
+plow-boot: gateway exited code=78
+```
+
+Fix: Docker Desktop → Settings → General → turn **off** "Use Rosetta for
+x86_64/amd64 emulation on Apple Silicon", restart Docker Desktop, then run
+`docker compose up --build -d`. The gateway then boots in about 30 seconds.
+A `qemu: uncaught target signal 11` line from the Agent Index usage reporter
+is expected under QEMU and does not affect the agent.
+
+Before the first deploy, `docker compose config` and `scripts/doctor.sh`
+report `env file ./plow-credentials not found`. That is expected; deploy
+creates the file.
+
+### Latch Gatekeeper
+
+Latch reviews every browser request against the agent purpose saved in its
+settings. If that text does not mention X or LinkedIn, the request is denied
+and the agent reports "your Mac's Gatekeeper denied the request". Add a line
+such as "allow the social media agent to browse x.com and linkedin.com to read
+notifications and mentions; it may draft replies but must not post without my
+APPROVE" to the Latch agent purpose before running `CHECK X`.
+
 Open the local owner dashboard at <http://localhost:3001>. Do not expose this
 port beyond loopback.
 
