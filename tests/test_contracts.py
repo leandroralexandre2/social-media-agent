@@ -10,8 +10,8 @@ def text(path: str) -> str:
 
 def test_image_inherits_current_pinned_plow_openclaw_base():
     dockerfile = text("Dockerfile")
-    assert "base-1e73c82c4b3e0c9f76935bc0cc45061875b34aee@sha256:" in dockerfile
-    assert "5f8ef7c3762b037420cd8843a767a7ab7e2433b1c8319e7cfe2ad1bdef5dee8a" in dockerfile
+    assert "base-771198a9609dcef54d44843e7da5329c17fa51b4@sha256:" in dockerfile
+    assert "f1e7c421b97a80f1bd17015f96daceb965f350a241f7edc7e4d856a0e3a6f8f5" in dockerfile
     assert "AGENT_RUNTIME=OpenClaw" in dockerfile
     assert "HERMES" not in dockerfile
 
